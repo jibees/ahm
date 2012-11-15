@@ -5,7 +5,6 @@
 
 // initialize the library with the numbers of the interface pins
 // TODO LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
-
 String currentDate;   
 int zone1_Output = 9;
 int zone2_Output = 10;
@@ -47,7 +46,7 @@ void loop() {
   
 
 
-  // Wait 3s & restart...
+  // Wait 3s & restart the loop...
   delay(3000);
 }
 
