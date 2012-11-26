@@ -9,13 +9,16 @@ LiquidCrystal lcd(9, 8, 5, 4, 3, 2);
 // Timezone shifting : we are in Europe/Paris ie. +1 
 const int timezoneShiftInHour = 1;
 
-const int zone1Output = 10;
-const int zone2Output = 11;
-const int zone3Output = 12;
+// Set the output values
+const int zone1Output = 11;
+const int zone2Output = 12;
+const int zone3Output = 13;
 
+// Define consts about mode eco and mode confort
 const int modeEco = HIGH;
 const int modeConfort = LOW;
 
+// Create and update the zone value (by default on confort)
 int zone1ModeValue = modeConfort;
 int zone2ModeValue = modeConfort;
 int zone3ModeValue = modeConfort;
@@ -36,17 +39,20 @@ void setup() {
     lcd.setCursor(0, 0);
     lcd.print("RTC Init... OK");   
   }
-  // set the RTC and the system time to the received value
+  // Set the time via RTC (copy/paste a timestamp (ie. number of seconds since Jan 1st 1970))
   //RTC.set(1353775757);  
   delay(1000);
 }
 
 void loop() {
+  // Manage zone by zone
   manageZone1();
   manageZone2();
+  manageZone3();
  
-  // Update the relais
+  // Update the relays
   updateTheRelays();
+  
   // Print the Date on row 1
   lcd.setCursor(0, 0);
   lcd.print(getPrintableDate());
@@ -55,73 +61,94 @@ void loop() {
   lcd.setCursor(0, 1);
   lcd.print(getPrintableZones());
   
-  
-  
   delay(10000);
 }
 
 void updateTheRelays() {
   digitalWrite(zone1Output, zone1ModeValue);
+  Serial.println("ZONE 1:" + String(zone1ModeValue));
+  
   digitalWrite(zone2Output, zone2ModeValue);
+  Serial.println("ZONE 2:" + String(zone2ModeValue));
+  
   digitalWrite(zone3Output, zone3ModeValue);
+  Serial.println("ZONE 3:" + String(zone3ModeValue));
 }
 
 // CHAMBRE DE MATILDA
 void manageZone1() {
+  int realHour = hour() + timezoneShiftInHour;
   switch (weekday()) {
     case 1:
     case 7:
-      // Weekend, Saturday, Sunday
-      // Always on
-      zone1ModeValue = modeConfort;
+      // Weekend, Saturday, Sunday : Always ON on sleep time
+      if (realHour < 8) {
+        zone1ModeValue = modeConfort;
+      } else if (realHour < 10) {
+         zone1ModeValue = modeEco;
+      } else if (realHour <= 12) {
+        zone1ModeValue = modeConfort;
+      } else if (realHour <= 15) {
+        zone1ModeValue = modeEco;
+      } else if (realHour <= 17) {
+        zone1ModeValue = modeConfort;
+      } 
+     
       break;
     default:
-      // On week
-      // modeConfort : 17h-8h
-      int realHour = hour() + timezoneShiftInHour;
+      // On week modeConfort : 17h-8h
       if (realHour < 8 || realHour > 17) {
         zone1ModeValue = modeConfort;
       } else {
+        // be default, mode eco
         zone1ModeValue = modeEco;
       }
       break;
   } 
+}
+
+
+// CHAMBRE DES PARENTS
+void manageZone2() {
+  // modeConfort 22h-00h
+  int realHour = hour() + timezoneShiftInHour;
+  if (22 < realHour  && realHour <= 23) {
+    zone2ModeValue = modeConfort;
+  } else {
+    // bu default, mode eco
+    zone2ModeValue = modeEco;
+    Serial.print(zone2ModeValue);
+  }
 }
 
 
 // SALON
 void manageZone3() {
+  int realHour = hour() + timezoneShiftInHour;
   switch (weekday()) {
     case 1:
     case 7:
-      // Weekend, Saturday, Sunday
-      // Always on
-      zone1ModeValue = modeConfort;
+      // Saturday, Sunday
+      if (realHour < 7 || realHour >= 23) {
+        // On night, mode eco
+        zone3ModeValue = modeEco;
+      } else {
+        zone3ModeValue = modeConfort;  
+      }
+      
       break;
     default:
       // On week
       // modeConfort : 17h-8h
-      int realHour = hour() + timezoneShiftInHour;
       if (17 < realHour < 23 || 7 < realHour < 9 ) {
-        zone1ModeValue = modeConfort;
+        zone3ModeValue = modeConfort;
       } else {
-        zone1ModeValue = modeEco;
+        zone3ModeValue = modeEco;
       }
       break;
   } 
 }
 
-// CHAMBRE DES PARENTS
-void manageZone2() {
-  // modeConfort 22h-23h
-  int realHour = hour() + timezoneShiftInHour;
-  if (22 < realHour  && realHour <= 23) {
-    zone2ModeValue = modeConfort;
-  } else {
-    zone2ModeValue = modeEco;
-    Serial.print(zone2ModeValue);
-  }
-}
 
 
 String getPrintableZones() {
