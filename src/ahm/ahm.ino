@@ -139,8 +139,8 @@ void manageZone3() {
       break;
     default:
       // On week
-      // modeConfort : 17h-8h
-      if (17 < realHour < 23 || 7 < realHour < 9 ) {
+      // modeConfort : 17h-23h && 7h-9h
+      if ((17 < realHour && realHour < 23) || (7 < realHour && realHour < 9 )) {
         zone3ModeValue = modeConfort;
       } else {
         zone3ModeValue = modeEco;
