@@ -1,7 +1,13 @@
-#include <DS1307RTC.h>
-#include <Time.h>  
 #include <Wire.h>
+#include <RTClib.h>
 #include <LiquidCrystal.h>
+//DL here http://code.google.com/p/arduino-pinchangeint/downloads/list
+#include <PinChangeInt.h>
+#include <PinChangeIntConfig.h>
+//DL here https://github.com/adafruit/RTClib
+
+//RTC
+RTC_DS1307 RTC;
 
 // initialize the library with the numbers of the interface pins
 LiquidCrystal lcd(9, 8, 5, 4, 3, 2);
@@ -13,6 +19,7 @@ const int timezoneShiftInHour = 1;
 const int zone1Output = 11;
 const int zone2Output = 12;
 const int zone3Output = 13;
+const int pushButton1 = 6;
 
 // Define consts about mode eco and mode confort
 const int modeEco = HIGH;
@@ -23,6 +30,10 @@ int zone1ModeValue = modeConfort;
 int zone2ModeValue = modeConfort;
 int zone3ModeValue = modeConfort;
 
+//bounce management
+#define BOUNCE_DURATION 500
+volatile unsigned long bounceTime=0;
+
 void setup() {
   Serial.begin(9600);
   lcd.begin(16, 2);
@@ -31,17 +42,22 @@ void setup() {
   
   lcd.setCursor(0, 0);
   lcd.print("RTC Init... ");
-  setSyncProvider(RTC.get);
-  if(timeStatus()!= timeSet) {
-    lcd.setCursor(0, 0);
-    lcd.print("Unable to sync with the RTC");
-  } else {
-    lcd.setCursor(0, 0);
-    lcd.print("RTC Init... OK");   
-  }
-  // Set the time via RTC (copy/paste a timestamp (ie. number of seconds since Jan 1st 1970))
-  //RTC.set(1353775757);  
+  Wire.begin();
+  RTC.begin();
+  //RTC.adjust(DateTime(__DATE__, __TIME__));
+  
+  //configure interrupt
+  pinMode(pushButton1, INPUT);
+  PCintPort::attachInterrupt(pushButton1, button1Pushed , RISING); 
+  
   delay(1000);
+}
+
+void button1Pushed() {
+  if(millis() > bounceTime)  {
+      Serial.println("button1Pushed");
+      bounceTime = millis() + BOUNCE_DURATION;  // set whatever bounce time in ms is appropriate
+  }
 }
 
 void loop() {
@@ -61,7 +77,7 @@ void loop() {
   lcd.setCursor(0, 1);
   lcd.print(getPrintableZones());
   
-  delay(10000);
+  delay(1000);
 }
 
 void updateTheRelays() {
@@ -77,8 +93,9 @@ void updateTheRelays() {
 
 // CHAMBRE DE MATILDA
 void manageZone1() {
-  int realHour = hour() + timezoneShiftInHour;
-  switch (weekday()) {
+  DateTime date = RTC.now();
+  int realHour = date.hour() + timezoneShiftInHour;
+  switch (date.dayOfWeek()) {
     case 1:
     case 7:
       // Weekend, Saturday, Sunday : Always ON on sleep time
@@ -110,8 +127,9 @@ void manageZone1() {
 
 // CHAMBRE DES PARENTS
 void manageZone2() {
+  DateTime date = RTC.now();
   // modeConfort 22h-00h
-  int realHour = hour() + timezoneShiftInHour;
+  int realHour = date.hour() + timezoneShiftInHour;
   if (22 < realHour  && realHour <= 23) {
     zone2ModeValue = modeConfort;
   } else {
@@ -124,8 +142,9 @@ void manageZone2() {
 
 // SALON
 void manageZone3() {
-  int realHour = hour() + timezoneShiftInHour;
-  switch (weekday()) {
+  DateTime date = RTC.now();
+  int realHour = date.hour() + timezoneShiftInHour;
+  switch (date.dayOfWeek()) {
     case 1:
     case 7:
       // Saturday, Sunday
@@ -178,30 +197,36 @@ String getModeStringValue(int zoneModeValue) {
 }
 
 String getPrintableDate() {
+  
+  DateTime date = RTC.now();
+  
+  Serial.println(date.unixtime());
+  //Serial.println(now());
+  
    // Lu 23 11 16:03:09
   String printableDate = String();
   // Day Of Week
-  printableDate = String(getDayOfWeek(weekday())); 
+  printableDate = String(getDayOfWeek(date.dayOfWeek())); 
   // Day in Month
   printableDate += " "; 
-  printableDate += String(day());
+  printableDate += printDigitForDate(date.day());
   // Month
   printableDate += "/"; 
-  printableDate += String(month());
+  printableDate += printDigitForDate(date.month());
   
   // Hour
   printableDate += " ";
-  printableDate += printDigitForDate(hour()+timezoneShiftInHour);
+  printableDate += printDigitForDate(date.hour()+timezoneShiftInHour);
   // Minute
   printableDate += ":";
-  printableDate += printDigitForDate(minute());
+  printableDate += printDigitForDate(date.minute());
   
   //Serial.println(printableDate);
   return printableDate;
 }
 
 String getDayOfWeek(int weekday){
-  switch(weekday) {
+  switch(weekday + 1) {
     case 1:
       return "Sun";
     case 2:
